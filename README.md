@@ -21,6 +21,7 @@ Front-end work has changed a lot since the SPA-everything era: rendering moved b
 ## What's implemented
 
 - Scaffold: Next.js 15 App Router, React 19, strict TypeScript, Vitest + Testing Library, GitHub Actions CI, and a design-token stylesheet. The home route lists the planned concepts using an accessible `ConceptCard` component.
+- Design tokens: a typed token tree in `src/tokens` that generates the app's CSS custom properties. The root layout injects the generated `:root` rule at render time, so the token module is the runtime source and there is no second copy to drift. See the `/tokens` route.
 
 ## Stack
 
@@ -48,6 +49,15 @@ import { ConceptCard } from '@/components/concept-card'
   description="A typed token system for color, spacing, and type scale."
   status="planned"
 />
+```
+
+Styles reference tokens through a typed helper, so a bad name fails to compile:
+
+```tsx
+import { token } from '@/tokens'
+
+<div style={{ color: token('color', 'accent'), padding: token('space', '4') }} />
+// token('color', 'nope') -> type error
 ```
 
 ## Layout

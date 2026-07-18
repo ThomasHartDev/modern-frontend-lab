@@ -21,7 +21,8 @@ const CONCEPTS: readonly Concept[] = [
   {
     title: 'Design tokens',
     description: 'A typed token system that stays the single origin for color, spacing, and type scale.',
-    status: 'planned'
+    status: 'done',
+    href: '/tokens'
   },
   {
     title: 'List virtualization',
