@@ -19,7 +19,7 @@ const cardStyle: React.CSSProperties = {
   display: 'block',
   padding: 'var(--space-6)',
   border: '1px solid var(--color-border)',
-  borderRadius: 'var(--radius)',
+  borderRadius: 'var(--radius-md)',
   background: 'var(--color-surface)',
   color: 'inherit',
   textDecoration: 'none'
