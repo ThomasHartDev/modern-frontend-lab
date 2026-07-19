@@ -11,7 +11,8 @@ const CONCEPTS: readonly Concept[] = [
   {
     title: 'Server Components & streaming',
     description: 'Render on the server, stream HTML as it resolves, and ship less JavaScript to the client.',
-    status: 'planned'
+    status: 'done',
+    href: '/streaming'
   },
   {
     title: 'Suspense data fetching',

@@ -11,6 +11,8 @@ Front-end work has changed a lot since the SPA-everything era: rendering moved b
 - React Server Components: server-first rendering, less client JavaScript
 - Streaming SSR with Suspense boundaries and progressive hydration
 - Suspense-based data fetching instead of scattered loading flags
+- Request-scoped memoization for fetch deduplication (the `React.cache()` pattern)
+- Out-of-order streaming: boundaries flush by resolution time, not tree order
 - App Router file conventions (`layout`, `page`, `loading`, `error`)
 - Type-safe design tokens as a single origin for color, spacing, and type scale
 - Core Web Vitals: LCP, CLS, and INP tracked against a budget
@@ -22,6 +24,7 @@ Front-end work has changed a lot since the SPA-everything era: rendering moved b
 
 - Scaffold: Next.js 15 App Router, React 19, strict TypeScript, Vitest + Testing Library, GitHub Actions CI, and a design-token stylesheet. The home route lists the planned concepts using an accessible `ConceptCard` component.
 - Design tokens: a typed token tree in `src/tokens` that generates the app's CSS custom properties. The root layout injects the generated `:root` rule at render time, so the token module is the runtime source and there is no second copy to drift. See the `/tokens` route.
+- Server Components + streaming: the `/streaming` route is a Server Component whose three cards are each their own async Server Component behind a Suspense boundary. The shell flushes first, then each card streams in as its own fetch settles, fastest first. Data comes from a small simulated layer built on a request-scoped memoizing loader (the `React.cache()` pattern), so components that read the same key during one render share a single fetch and a rejection is cached the same way. Tests cover the loader dedup, out-of-order settle order, and the async components rendered to static markup. See the `/streaming` route.
 
 ## Stack
 
@@ -49,6 +52,16 @@ import { ConceptCard } from '@/components/concept-card'
   description="A typed token system for color, spacing, and type scale."
   status="planned"
 />
+```
+
+Each streaming card is an async Server Component reading from a request-scoped store, wrapped in its own boundary so it streams independently:
+
+```tsx
+const store = createDataStore() // one per request, so the loaders memoize per render
+
+<Suspense fallback={<Skeleton label="profile" lines={2} />}>
+  <ProfileCard store={store} id="u1" />   // async () => <section>…</section>
+</Suspense>
 ```
 
 Styles reference tokens through a typed helper, so a bad name fails to compile:
