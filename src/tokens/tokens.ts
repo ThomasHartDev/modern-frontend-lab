@@ -8,7 +8,8 @@ export const tokens = {
     border: '#262b36',
     text: '#e7eaf0',
     muted: '#9aa3b2',
-    accent: '#5eead4'
+    accent: '#5eead4',
+    danger: '#f87171'
   },
   space: {
     '2': '0.5rem',

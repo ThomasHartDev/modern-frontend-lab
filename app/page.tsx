@@ -15,9 +15,10 @@ const CONCEPTS: readonly Concept[] = [
     href: '/streaming'
   },
   {
-    title: 'Suspense data fetching',
-    description: 'Coordinate loading states with Suspense boundaries instead of scattered isLoading flags.',
-    status: 'planned'
+    title: 'Server actions & optimistic UI',
+    description: 'Mutate through a Server Action and show the result instantly with useOptimistic, reverting on failure.',
+    status: 'done',
+    href: '/data-patterns'
   },
   {
     title: 'Design tokens',
