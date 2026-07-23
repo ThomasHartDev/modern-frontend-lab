@@ -21,6 +21,12 @@ const CONCEPTS: readonly Concept[] = [
     href: '/data-patterns'
   },
   {
+    title: 'Client state: context vs store',
+    description: 'Same pure reducer, two hosts: React Context re-renders every consumer; a store selects slices.',
+    status: 'done',
+    href: '/state-management'
+  },
+  {
     title: 'Design tokens',
     description: 'A typed token system that stays the single origin for color, spacing, and type scale.',
     status: 'done',

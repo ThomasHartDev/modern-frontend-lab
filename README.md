@@ -16,6 +16,10 @@ Front-end work has changed a lot since the SPA-everything era: rendering moved b
 - `useActionState` and `useFormStatus` for form result, error, and pending states
 - Request-scoped memoization for fetch deduplication (the `React.cache()` pattern)
 - Out-of-order streaming: boundaries flush by resolution time, not tree order
+- Pure reducers and discriminated-union actions for client state transitions
+- React Context with split state/dispatch providers
+- External stores via `useSyncExternalStore` and selector subscriptions
+- Re-render isolation: when context wins vs when a store wins
 - App Router file conventions (`layout`, `page`, `loading`, `error`)
 - Type-safe design tokens as a single origin for color, spacing, and type scale
 - Core Web Vitals: LCP, CLS, and INP tracked against a budget
@@ -28,8 +32,8 @@ Front-end work has changed a lot since the SPA-everything era: rendering moved b
 - Scaffold: Next.js 15 App Router, React 19, strict TypeScript, Vitest + Testing Library, GitHub Actions CI, and a design-token stylesheet. The home route lists the planned concepts using an accessible `ConceptCard` component.
 - Design tokens: a typed token tree in `src/tokens` that generates the app's CSS custom properties. The root layout injects the generated `:root` rule at render time, so the token module is the runtime source and there is no second copy to drift. See the `/tokens` route.
 - Server Components + streaming: the `/streaming` route is a Server Component whose three cards are each their own async Server Component behind a Suspense boundary. The shell flushes first, then each card streams in as its own fetch settles, fastest first. Data comes from a small simulated layer built on a request-scoped memoizing loader (the `React.cache()` pattern), so components that read the same key during one render share a single fetch and a rejection is cached the same way. Tests cover the loader dedup, out-of-order settle order, and the async components rendered to static markup. See the `/streaming` route.
-
 - Server actions & optimistic UI: the `/data-patterns` route mutates a note list through a Server Action, so the browser never runs a fetch handler or a client API layer. `useActionState` holds the confirmed list plus the last error, `useOptimistic` overlays the in-flight note on top of it, and `useFormStatus` drives the pending button. The overlay is only a prediction, so React discards it when the action settles and a rejected write reverts on its own with no manual rollback. The mutation core (`applyAdd`) takes an injected store, which keeps validation, the fail path, and the store-throws path testable without the Next runtime. Tests cover trimming and length validation, the optimistic reducer folding pending dispatches newest-first, and confirmed state staying put on every failure mode. See the `/data-patterns` route.
+- Client state patterns: the `/state-management` route runs one pure cart reducer in two hosts. Context + `useReducer` (split state/dispatch) re-renders every state consumer on any field change. An external store on `useSyncExternalStore` lets each leaf select a slice and skip the render when that slice is unchanged. Typing the note field is the repro: context bumps badge and total counters; the store leaves them alone.
 
 ## Stack
 
@@ -85,6 +89,14 @@ async function onSubmit(formData: FormData) {
 // fail or a thrown store -> confirmed list unchanged, error set
 ```
 
+The same cart reducer can sit in Context or in an external store. Selectors decide who re-renders:
+
+```tsx
+const store = createReducerStore(cartReducer, EMPTY_CART)
+const count = useStoreSelector(store, selectItemCount)
+store.dispatch({ type: 'setNote', note: 'gift' }) // count subscriber stays quiet
+```
+
 Styles reference tokens through a typed helper, so a bad name fails to compile:
 
 ```tsx
@@ -99,5 +111,7 @@ import { token } from '@/tokens'
 ```
 app/                 App Router routes, layout, and global tokens
 src/components/      shared, tested UI primitives
+src/state/           pure cart reducer, context provider, external store
+src/tokens/          typed design tokens and CSS variable generation
 test/                Vitest specs and setup
 ```
