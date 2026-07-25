@@ -35,7 +35,8 @@ const CONCEPTS: readonly Concept[] = [
   {
     title: 'List virtualization',
     description: 'Render only the rows in view to keep large lists at 60fps.',
-    status: 'planned'
+    status: 'done',
+    href: '/virtualization'
   },
   {
     title: 'Core Web Vitals budget',
