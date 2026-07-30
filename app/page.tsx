@@ -41,7 +41,8 @@ const CONCEPTS: readonly Concept[] = [
   {
     title: 'Core Web Vitals budget',
     description: 'Track LCP, CLS, and INP against a budget so regressions fail loudly.',
-    status: 'planned'
+    status: 'done',
+    href: '/cwv'
   }
 ]
 
