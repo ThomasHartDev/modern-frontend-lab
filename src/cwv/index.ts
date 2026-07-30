@@ -56,7 +56,8 @@ export function evaluateMetric(
   budget: Budget = DEFAULT_BUDGET
 ): MetricEvaluation {
   const limit = budget[sample.name]
-  if (sample.value === null || !Number.isFinite(sample.value)) {
+  // Pure evaluator: null, NaN/±Inf, and negatives are unknown (not rated).
+  if (sample.value === null || !Number.isFinite(sample.value) || sample.value < 0) {
     return {
       name: sample.name,
       value: sample.value,
@@ -76,16 +77,22 @@ export function evaluateMetric(
   }
 }
 
+/**
+ * Hard gate: every budgeted metric must be present, finite, and within ceiling.
+ * Partial / null samples stay on the report as rating unknown; pass stays false.
+ */
 export function evaluateBudget(
   samples: readonly MetricSample[],
   budget: Budget = DEFAULT_BUDGET
 ): BudgetReport {
   const metrics = samples.map((s) => evaluateMetric(s, budget))
-  const known = metrics.filter((m) => m.value !== null && Number.isFinite(m.value))
-  return {
-    metrics,
-    pass: known.length > 0 && known.every((m) => m.withinBudget)
-  }
+  const byName = new Map(metrics.map((m) => [m.name, m]))
+  const budgetKeys = Object.keys(budget) as MetricName[]
+  const pass = budgetKeys.every((name) => {
+    const m = byName.get(name)
+    return m != null && m.withinBudget
+  })
+  return { metrics, pass }
 }
 
 export interface LcpEntryLike {
@@ -117,14 +124,20 @@ export function computeLcp(entries: readonly LcpEntryLike[]): number | null {
 /**
  * CLS = max session-window sum. Windows group shifts within 1s of the previous
  * and 5s of the first; input-driven shifts are excluded.
+ * Entries are sorted by startTime (stable copy) so out-of-order reports match Chrome.
  */
 export function computeCls(shifts: readonly LayoutShiftLike[]): number {
+  const ordered = shifts
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => a.s.startTime - b.s.startTime || a.i - b.i)
+    .map(({ s }) => s)
+
   let max = 0
   let windowScore = 0
   let windowStart = 0
   let lastTime = Number.NEGATIVE_INFINITY
 
-  for (const s of shifts) {
+  for (const s of ordered) {
     if (s.hadRecentInput) continue
     if (!Number.isFinite(s.value) || s.value < 0) continue
     if (!Number.isFinite(s.startTime) || s.startTime < 0) continue
@@ -144,7 +157,12 @@ export function computeCls(shifts: readonly LayoutShiftLike[]): number {
   return max
 }
 
-/** Under 50 samples: worst latency. At scale: ~98th percentile. */
+/**
+ * Under 50 samples: worst latency (Chrome/web-vitals uses the single worst event
+ * until the interaction count is high enough for a percentile).
+ * At scale: ~98th percentile index `ceil(n * 0.98) - 1` — lab approximation of the
+ * web-vitals / CrUX INP selection, not a full Event Timing observer.
+ */
 export function computeInp(interactions: readonly InteractionLike[]): number | null {
   const ds: number[] = []
   for (const i of interactions) {
@@ -153,6 +171,7 @@ export function computeInp(interactions: readonly InteractionLike[]): number | n
   if (ds.length === 0) return null
   ds.sort((a, b) => a - b)
   if (ds.length < 50) return ds[ds.length - 1] ?? null
+  // web-vitals-style high percentile: ceil(n*0.98)-1 after ascending sort
   const idx = Math.min(ds.length - 1, Math.ceil(ds.length * 0.98) - 1)
   return ds[idx] ?? null
 }
@@ -199,5 +218,28 @@ export function projectRoute(pattern: RoutePattern): PatternProjection {
       { name: 'INP', value: 48 },
       { name: 'CLS', value: estimateImageLayoutShift({ ...media, reserved: true }) }
     ]
+  }
+}
+
+export type InpProbeMode = 'sync' | 'deferred'
+
+/**
+ * Lab INP probe semantics: both modes can share the same work duration; what
+ * differs is click→first-frame. Sync blocks paint (frame latency includes work);
+ * deferred yields a frame first so to-first-frame and work are separate numbers.
+ */
+export function inpProbeLabels(mode: InpProbeMode): {
+  mode: InpProbeMode
+  blocksPaint: boolean
+  dualReadout: true
+  frameLabel: string
+  workLabel: string
+} {
+  return {
+    mode,
+    blocksPaint: mode === 'sync',
+    dualReadout: true,
+    frameLabel: mode === 'sync' ? 'click → paint (blocked by work)' : 'click → first frame (before work)',
+    workLabel: 'work loop'
   }
 }

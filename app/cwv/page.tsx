@@ -13,6 +13,7 @@ export default function CwvPage() {
       <p style={{ color: token('color', 'muted'), marginTop: 0 }}>
         Field performance is scored on Largest Contentful Paint (LCP), Interaction to Next Paint (INP),
         and Cumulative Layout Shift (CLS). A budget is a hard ceiling so regressions fail the report.
+        This lab evaluates projected route samples against those ceilings (not a live field RUM panel).
       </p>
       <p style={{ color: token('color', 'muted'), fontFamily: 'var(--font-mono)', fontSize: token('fontSize', 'sm') }}>
         Budget: LCP ≤ {DEFAULT_BUDGET.LCP}ms · INP ≤ {DEFAULT_BUDGET.INP}ms · CLS ≤ {DEFAULT_BUDGET.CLS}
@@ -23,8 +24,9 @@ export default function CwvPage() {
         <p>
           LCP is largest text/image render time. INP is interaction-to-paint latency (lab: worst under 50
           samples, then ~98th percentile). CLS is the max session-window sum of layout shifts (1s gap, 5s
-          cap; input-driven shifts excluded). Slow panel: unreserved hero, late LCP, sync click work.
-          Fixed: aspect-ratio reservation, server-rendered LCP, deferred work.
+          cap; input-driven shifts excluded). The tables use projected samples from `projectRoute`. Slow
+          panel: no reserved hero size and a late inject so content under it shifts; fixed panel uses
+          aspect-ratio reservation. The INP probe reports click→first-frame separately from work duration.
         </p>
       </section>
     </main>

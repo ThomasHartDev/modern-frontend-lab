@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   CWV_THRESHOLDS,
@@ -9,6 +9,7 @@ import {
   estimateImageLayoutShift,
   evaluateBudget,
   evaluateMetric,
+  inpProbeLabels,
   projectRoute,
   rateMetric
 } from '@/cwv'
@@ -31,11 +32,33 @@ describe('budget + metrics', () => {
       withinBudget: false,
       headroom: null
     })
+    expect(evaluateMetric({ name: 'LCP', value: Number.NaN })).toMatchObject({
+      rating: 'unknown',
+      withinBudget: false
+    })
+    expect(evaluateMetric({ name: 'CLS', value: -0.01 })).toMatchObject({
+      rating: 'unknown',
+      withinBudget: false
+    })
     expect(evaluateBudget([]).pass).toBe(false)
+    // Hard gate: null / missing budgeted metrics must not pass.
     expect(
       evaluateBudget([
         { name: 'LCP', value: 1000 },
         { name: 'INP', value: null },
+        { name: 'CLS', value: 0.01 }
+      ]).pass
+    ).toBe(false)
+    expect(
+      evaluateBudget([
+        { name: 'LCP', value: 1000 },
+        { name: 'CLS', value: 0.01 }
+      ]).pass
+    ).toBe(false)
+    expect(
+      evaluateBudget([
+        { name: 'LCP', value: 1000 },
+        { name: 'INP', value: 40 },
         { name: 'CLS', value: 0.01 }
       ]).pass
     ).toBe(true)
@@ -82,9 +105,16 @@ describe('budget + metrics', () => {
         { value: 0.2, startTime: 2000 }
       ])
     ).toBeCloseTo(0.2)
+    // Reverse order must match chronological windowing (max window 0.1, not 0.2).
+    expect(
+      computeCls([
+        { value: 0.1, startTime: 2000 },
+        { value: 0.1, startTime: 0 }
+      ])
+    ).toBeCloseTo(0.1)
+    // Eight 0.04 shifts at 900ms steps: windows break on 5s cap → max session sum 0.24.
     const long = Array.from({ length: 8 }, (_, i) => ({ value: 0.04, startTime: i * 900 }))
-    expect(computeCls(long)).toBeGreaterThan(0)
-    expect(computeCls(long)).toBeLessThanOrEqual(0.28)
+    expect(computeCls(long)).toBeCloseTo(0.24)
 
     expect(computeInp([])).toBe(null)
     expect(computeInp([{ duration: -1 }])).toBe(null)
@@ -99,20 +129,44 @@ describe('budget + metrics', () => {
     expect(estimateImageLayoutShift({ imageWidth: 0, imageHeight: 240, reserved: false })).toBe(0)
     expect(estimateImageLayoutShift({ imageWidth: 360, imageHeight: 240, reserved: false })).toBeGreaterThan(0)
   })
+
+  it('documents INP probe dual-readout semantics per mode', () => {
+    const sync = inpProbeLabels('sync')
+    const deferred = inpProbeLabels('deferred')
+    expect(sync.dualReadout).toBe(true)
+    expect(deferred.dualReadout).toBe(true)
+    expect(sync.blocksPaint).toBe(true)
+    expect(deferred.blocksPaint).toBe(false)
+    expect(sync.frameLabel).not.toBe(deferred.frameLabel)
+  })
 })
 
 describe('CwvDemo', () => {
-  it('renders budget cells and runs the INP probe', async () => {
+  it('renders budget cells, late-inject slow hero, and dual INP readouts', async () => {
     const user = userEvent.setup()
     render(<CwvDemo />)
     expect(screen.getByTestId('slow-verdict')).toHaveTextContent('FAIL')
     expect(screen.getByTestId('fixed-verdict')).toHaveTextContent('PASS')
     expect(screen.getByTestId('slow-LCP-rating')).toHaveTextContent('fail')
     expect(screen.getByTestId('fixed-CLS-value')).toHaveTextContent('0.000')
+    expect(screen.getByTestId('hero-fixed')).toBeInTheDocument()
+    // Slow path must not reserve height up front; late inject mounts the box.
+    expect(screen.queryByTestId('hero-late-box')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByTestId('hero-late-box')).toBeInTheDocument()
+    })
+
     await user.click(screen.getByTestId('inp-run'))
-    expect(screen.getByTestId('inp-ms').textContent).toMatch(/ms work/)
+    expect(screen.getByTestId('inp-to-frame').textContent).toMatch(/ms to first frame/)
+    expect(screen.getByTestId('inp-work').textContent).toMatch(/ms work/)
+    expect(screen.getByTestId('inp-mode-label')).toHaveTextContent(/sync: frame includes work/)
+
     await user.click(screen.getByLabelText(/Deferred past paint/i))
     await user.click(screen.getByTestId('inp-run'))
-    expect(screen.getByTestId('inp-ms').textContent).toMatch(/ms work/)
+    await waitFor(() => {
+      expect(screen.getByTestId('inp-to-frame').textContent).toMatch(/ms to first frame/)
+      expect(screen.getByTestId('inp-work').textContent).toMatch(/ms work/)
+    })
+    expect(screen.getByTestId('inp-mode-label')).toHaveTextContent(/deferred: frame before work/)
   })
 })
