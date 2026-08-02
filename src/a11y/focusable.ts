@@ -9,6 +9,7 @@ const FOCUSABLE_SELECTOR = [
   '[contenteditable="true"]'
 ].join(',')
 
+// DOM order only — not full tab order when positive tabindex values exist.
 export function getTabbableElements(root: ParentNode): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter((el) => {
     if (el.tabIndex < 0 || el.hidden || el.getAttribute('aria-hidden') === 'true') return false

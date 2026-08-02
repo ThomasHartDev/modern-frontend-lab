@@ -1,6 +1,15 @@
 'use client'
 
-import { useEffect, useId, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react'
+import {
+  useEffect,
+  useId,
+  useRef,
+  type CSSProperties,
+  type PointerEvent,
+  type ReactNode,
+  type RefObject
+} from 'react'
+import { createPortal } from 'react-dom'
 import { getTabbableElements } from './focusable'
 
 export interface DialogProps {
@@ -34,6 +43,7 @@ const panel: CSSProperties = {
 
 export function Dialog({ open, onClose, title, children, initialFocusRef }: DialogProps) {
   const titleId = useId()
+  const portalRootRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const restoreRef = useRef<HTMLElement | null>(null)
   const onCloseRef = useRef(onClose)
@@ -84,10 +94,48 @@ export function Dialog({ open, onClose, title, children, initialFocusRef }: Dial
     }
   }, [open, initialFocusRef])
 
-  if (!open) return null
+  // APG modals: exclude background from the a11y tree while open (portal + inert).
+  useEffect(() => {
+    if (!open) return
+    const portalRoot = portalRootRef.current
+    if (portalRoot === null) return
 
-  return (
-    <div style={overlay} data-testid="dialog-overlay">
+    type Snapshot = { el: HTMLElement; inert: boolean; ariaHidden: string | null }
+    const previous: Snapshot[] = []
+    for (const child of Array.from(document.body.children)) {
+      if (!(child instanceof HTMLElement) || child === portalRoot) continue
+      previous.push({
+        el: child,
+        inert: child.inert,
+        ariaHidden: child.getAttribute('aria-hidden')
+      })
+      child.inert = true
+      child.setAttribute('aria-hidden', 'true')
+    }
+    return () => {
+      for (const { el, inert, ariaHidden } of previous) {
+        el.inert = inert
+        if (ariaHidden === null) el.removeAttribute('aria-hidden')
+        else el.setAttribute('aria-hidden', ariaHidden)
+      }
+    }
+  }, [open])
+
+  function onOverlayPointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget) return
+    event.preventDefault()
+    panelRef.current?.focus()
+  }
+
+  if (!open || typeof document === 'undefined') return null
+
+  return createPortal(
+    <div
+      ref={portalRootRef}
+      style={overlay}
+      data-testid="dialog-overlay"
+      onPointerDown={onOverlayPointerDown}
+    >
       <div
         ref={panelRef}
         role="dialog"
@@ -107,6 +155,7 @@ export function Dialog({ open, onClose, title, children, initialFocusRef }: Dial
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

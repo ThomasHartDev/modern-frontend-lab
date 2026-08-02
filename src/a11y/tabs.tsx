@@ -15,7 +15,7 @@ export interface TabsProps {
   label: string
 }
 
-const ROVING = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'])
+const ROVING = new Set(['ArrowLeft', 'ArrowRight', 'Home', 'End'])
 
 export function Tabs({ items, defaultIndex = 0, label }: TabsProps) {
   const baseId = useId()
@@ -24,23 +24,26 @@ export function Tabs({ items, defaultIndex = 0, label }: TabsProps) {
   const refs = useRef<Array<HTMLButtonElement | null>>([])
 
   if (items.length === 0) return <p role="status">No tabs</p>
-  const active = items[activeIndex] ?? items[0]!
+
+  const safeIndex = Math.min(Math.max(activeIndex, 0), items.length - 1)
+  const active = items[safeIndex]!
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (!ROVING.has(event.key)) return
-    event.preventDefault()
     const next = nextRovingIndex({
       length: items.length,
-      current: activeIndex,
+      current: safeIndex,
       key: event.key as RovingKey,
       orientation: 'horizontal',
       loop: true
     })
+    if (next === safeIndex) return
+    event.preventDefault()
     setActiveIndex(next)
     refs.current[next]?.focus()
   }
 
-return (
+  return (
     <div data-testid="tabs-root">
       <div
         role="tablist"
@@ -49,7 +52,7 @@ return (
         style={{ display: 'flex', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-border)' }}
       >
         {items.map((item, index) => {
-          const selected = index === activeIndex
+          const selected = index === safeIndex
           return (
             <button
               key={item.id}
