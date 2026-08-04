@@ -43,6 +43,7 @@ export function useFlip(options: UseFlipOptions): UseFlipResult {
         el.style.transform = ''
         continue
       }
+      el.style.transformOrigin = '0 0'
       el.style.transition = 'none'
       el.style.transform = invertTransform(entry.delta)
       void el.getBoundingClientRect()

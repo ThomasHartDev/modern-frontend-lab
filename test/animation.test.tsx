@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { afterEach } from 'vitest'
 import {
   captureRects,
   computeFlipDelta,
@@ -97,42 +98,141 @@ describe('shuffleTiles', () => {
   })
 })
 
-function FlipHarness({ order, reduced = false }: { order: readonly string[]; reduced?: boolean }) {
-  const { register } = useFlip({ ids: order, durationMs: 200, prefersReducedMotion: reduced })
+type Box = { x: number; y: number; width: number; height: number }
+
+/** Captures style at the invert reflow (getBoundingClientRect while transform is non-empty). */
+const invertSnapshots = new Map<string, { transform: string; origin: string }>()
+
+function mockRect(box: Box): DOMRect {
+  return {
+    x: box.x,
+    y: box.y,
+    width: box.width,
+    height: box.height,
+    top: box.y,
+    left: box.x,
+    right: box.x + box.width,
+    bottom: box.y + box.height,
+    toJSON: () => ({})
+  } as DOMRect
+}
+
+function FlipHarness({
+  order,
+  prefersReducedMotion,
+  boxes
+}: {
+  order: readonly string[]
+  /** When omitted, useFlip falls through to the OS media query. */
+  prefersReducedMotion?: boolean
+  boxes?: ReadonlyMap<string, Box>
+}) {
+  const flipOpts =
+    prefersReducedMotion === undefined
+      ? { ids: order, durationMs: 200 }
+      : { ids: order, durationMs: 200, prefersReducedMotion }
+  const { register } = useFlip(flipOpts)
   return (
     <div>
-      {order.map((id, index) => (
-        <div
-          key={id}
-          ref={(el) => {
-            if (el !== null) {
-              el.getBoundingClientRect = () =>
-                ({ x: index * 100, y: 0, width: 100, height: 40, top: 0, left: index * 100, right: index * 100 + 100, bottom: 40, toJSON: () => ({}) }) as DOMRect
-            }
-            register(id, el)
-          }}
-          data-testid={`el-${id}`}
-        />
-      ))}
+      {order.map((id, index) => {
+        const box = boxes?.get(id) ?? { x: index * 100, y: 0, width: 100, height: 40 }
+        return (
+          <div
+            key={id}
+            ref={(el) => {
+              if (el !== null) {
+                el.getBoundingClientRect = () => {
+                  if (el.style.transform) {
+                    invertSnapshots.set(id, {
+                      transform: el.style.transform,
+                      origin: el.style.transformOrigin
+                    })
+                  }
+                  return mockRect(box)
+                }
+              }
+              register(id, el)
+            }}
+            data-testid={`el-${id}`}
+          />
+        )
+      })}
     </div>
   )
 }
 
+function mockMatchMedia(reduced: boolean) {
+  window.matchMedia = ((query: string) =>
+    ({
+      matches: reduced && query.includes('prefers-reduced-motion'),
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false
+    }) as MediaQueryList) as typeof window.matchMedia
+}
+
 describe('useFlip + demo', () => {
-  it('transitions transform on reorder; instant under reduced motion', () => {
-    const { rerender } = render(<FlipHarness order={['a', 'b']} />)
+  afterEach(() => {
+    invertSnapshots.clear()
+  })
+
+  it('transitions transform on reorder; instant under forced reduced motion', () => {
+    const { rerender } = render(<FlipHarness order={['a', 'b']} prefersReducedMotion={false} />)
     const elA = screen.getByTestId('el-a')
     const elB = screen.getByTestId('el-b')
-    rerender(<FlipHarness order={['b', 'a']} />)
+    rerender(<FlipHarness order={['b', 'a']} prefersReducedMotion={false} />)
     expect(elA.style.transition).toContain('transform')
     expect(elA.style.transform).toBe('')
     expect(elB.style.transition).toContain('transform')
-    rerender(<FlipHarness order={['a', 'b']} reduced />)
+    rerender(<FlipHarness order={['a', 'b']} prefersReducedMotion />)
     expect(elA.style.transition).toBe('none')
     expect(elB.style.transition).toBe('none')
   })
 
+  it('sets transform-origin 0 0 and applies scale invert when size changes', () => {
+    const firstBoxes = new Map<string, Box>([
+      ['a', { x: 0, y: 0, width: 100, height: 40 }],
+      ['b', { x: 100, y: 0, width: 100, height: 40 }]
+    ])
+    // Different last geometry for a (position + size) so invert includes scale.
+    const lastBoxes = new Map<string, Box>([
+      ['a', { x: 50, y: 50, width: 200, height: 80 }],
+      ['b', { x: 100, y: 0, width: 100, height: 40 }]
+    ])
+    const { rerender } = render(
+      <FlipHarness order={['a', 'b']} prefersReducedMotion={false} boxes={firstBoxes} />
+    )
+    const elA = screen.getByTestId('el-a')
+    rerender(<FlipHarness order={['b', 'a']} prefersReducedMotion={false} boxes={lastBoxes} />)
+
+    // first 0,0 100x40 → last 50,50 200x80 ⇒ dx=-50, dy=-50, sx=0.5, sy=0.5
+    expect(invertSnapshots.get('a')).toEqual({
+      transform: 'translate(-50px, -50px) scale(0.5, 0.5)',
+      origin: '0 0'
+    })
+    expect(elA.style.transformOrigin).toBe('0 0')
+    expect(elA.style.transition).toContain('transform')
+    expect(elA.style.transform).toBe('')
+  })
+
+  it('omitting prefersReducedMotion honors OS matchMedia reduce (no timed transition)', () => {
+    mockMatchMedia(true)
+    const { rerender } = render(<FlipHarness order={['a', 'b']} />)
+    const elA = screen.getByTestId('el-a')
+    const elB = screen.getByTestId('el-b')
+    rerender(<FlipHarness order={['b', 'a']} />)
+    expect(elA.style.transition).toBe('none')
+    expect(elB.style.transition).toBe('none')
+    expect(elA.style.transform).toBe('')
+    expect(invertSnapshots.size).toBe(0)
+  })
+
   it('renders tiles, costs, and reduced-motion toggle', async () => {
+    mockMatchMedia(false)
     const user = userEvent.setup()
     render(<AnimationDemo />)
     expect(screen.getByTestId('flip-grid').querySelectorAll('[data-testid^="tile-"]')).toHaveLength(8)
@@ -143,5 +243,19 @@ describe('useFlip + demo', () => {
     expect(screen.getByTestId('motion-policy')).toHaveTextContent('instant (reduced-motion)')
     await user.click(screen.getByTestId('shuffle'))
     expect(screen.getByTestId('flip-grid').querySelectorAll('[data-testid^="tile-"]')).toHaveLength(8)
+  })
+
+  it('with OS reduced-motion and checkbox off, policy is instant and shuffle has no timed transform', async () => {
+    mockMatchMedia(true)
+    const user = userEvent.setup()
+    render(<AnimationDemo />)
+    expect(screen.getByTestId('reduced-toggle')).not.toBeChecked()
+    expect(screen.getByTestId('motion-policy')).toHaveTextContent('instant (reduced-motion)')
+    await user.click(screen.getByTestId('shuffle'))
+    const tile = screen.getByTestId('tile-tile-0')
+    expect(tile.style.transition === '' || tile.style.transition === 'none').toBe(true)
+    if (tile.style.transition.includes('transform') && tile.style.transition !== 'none') {
+      throw new Error(`expected no timed transform transition, got: ${tile.style.transition}`)
+    }
   })
 })

@@ -58,10 +58,13 @@ function CostRow({ label, props }: { label: string; props: readonly string[] }) 
   )
 }
 
-function FlipGrid({ tiles, reduced }: { tiles: readonly Tile[]; reduced: boolean }) {
+function FlipGrid({ tiles, forceReduced }: { tiles: readonly Tile[]; forceReduced: boolean }) {
   const ids = useMemo(() => tiles.map((t) => t.id), [tiles])
-  const { register } = useFlip({ ids, prefersReducedMotion: reduced, durationMs: 320 })
-  const policy = resolveMotionPolicy({ prefersReducedMotion: reduced, durationMs: 320 })
+  const motionOpts = forceReduced
+    ? { prefersReducedMotion: true as const, durationMs: 320 }
+    : { durationMs: 320 }
+  const { register } = useFlip({ ids, ...motionOpts })
+  const policy = resolveMotionPolicy(motionOpts)
   return (
     <section aria-label="FLIP reorder demo" style={card}>
       <h2 style={{ margin: 0, fontSize: token('fontSize', 'lg') }}>FLIP reorder</h2>
@@ -90,7 +93,7 @@ function FlipGrid({ tiles, reduced }: { tiles: readonly Tile[]; reduced: boolean
 
 export function AnimationDemo() {
   const [seed, setSeed] = useState(1)
-  const [reduced, setReduced] = useState(false)
+  const [forceReduced, setForceReduced] = useState(false)
   const base = useMemo(() => createTiles(8), [])
   const tiles = useMemo(() => shuffleTiles(base, seed), [base, seed])
   return (
@@ -101,11 +104,11 @@ export function AnimationDemo() {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: token('space', '3'), alignItems: 'center' }}>
         <button type="button" data-testid="shuffle" onClick={() => setSeed((s) => s + 1)}>Shuffle</button>
         <label style={{ display: 'inline-flex', gap: token('space', '2'), alignItems: 'center', fontSize: token('fontSize', 'sm') }}>
-          <input type="checkbox" data-testid="reduced-toggle" checked={reduced} onChange={(e) => setReduced(e.target.checked)} />
+          <input type="checkbox" data-testid="reduced-toggle" checked={forceReduced} onChange={(e) => setForceReduced(e.target.checked)} />
           Force reduced motion
         </label>
       </div>
-      <FlipGrid tiles={tiles} reduced={reduced} />
+      <FlipGrid tiles={tiles} forceReduced={forceReduced} />
       <section aria-label="Property cost comparison" style={card}>
         <h2 style={{ margin: 0, fontSize: token('fontSize', 'lg') }}>What to animate</h2>
         <CostRow label="good" props={['transform', 'opacity']} />
