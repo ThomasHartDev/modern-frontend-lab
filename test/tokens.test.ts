@@ -1,9 +1,19 @@
 import {
+  applyThemeAttribute,
+  colorThemes,
   cssVarName,
   cssVariablesToRootRule,
+  DEFAULT_THEME,
+  parseThemePreference,
+  resolveTheme,
+  sharedToCssVariables,
+  themeBootstrapScript,
+  themesToStyleSheet,
+  themeToCssVariables,
   token,
   tokens,
-  tokensToCssVariables
+  tokensToCssVariables,
+  THEME_STORAGE_KEY
 } from '@/tokens'
 
 describe('cssVarName', () => {
@@ -58,5 +68,54 @@ describe('cssVariablesToRootRule', () => {
     const rule = cssVariablesToRootRule(tokensToCssVariables())
     expect(rule).toContain('--color-accent: #5eead4;')
     expect(rule.startsWith(':root {')).toBe(true)
+  })
+})
+
+describe('light/dark themes', () => {
+  it('shares role keys and emits per-theme color vars plus color-scheme', () => {
+    expect(Object.keys(colorThemes.light).sort()).toEqual(Object.keys(colorThemes.dark).sort())
+    expect(colorThemes.light.bg).not.toBe(colorThemes.dark.bg)
+    expect(themeToCssVariables('light')['--color-bg']).toBe(colorThemes.light.bg)
+    expect(themeToCssVariables('dark')['color-scheme']).toBe('dark')
+    expect(Object.keys(sharedToCssVariables()).some((k) => k.startsWith('--color-'))).toBe(false)
+  })
+
+  it('parses preferences and resolves system against the OS', () => {
+    expect(parseThemePreference('light')).toBe('light')
+    expect(parseThemePreference(null)).toBe('system')
+    expect(parseThemePreference('nope')).toBe('system')
+    expect(resolveTheme('system', 'light')).toBe('light')
+    expect(resolveTheme('dark', 'light')).toBe('dark')
+  })
+
+  it('applies data-theme for explicit modes and clears it for system', () => {
+    const root = document.createElement('html')
+    applyThemeAttribute(root, 'light')
+    expect(root.getAttribute('data-theme')).toBe('light')
+    applyThemeAttribute(root, 'system')
+    expect(root.hasAttribute('data-theme')).toBe(false)
+  })
+
+  it('builds a stylesheet with root, data-theme blocks, and system media query', () => {
+    const sheet = themesToStyleSheet(DEFAULT_THEME)
+    expect(sheet).toContain('[data-theme="light"]')
+    expect(sheet).toContain('[data-theme="dark"]')
+    expect(sheet).toContain('@media (prefers-color-scheme: light)')
+    expect(sheet).toContain(':root:not([data-theme])')
+    expect(themesToStyleSheet('light')).toContain('@media (prefers-color-scheme: dark)')
+  })
+
+  it('bootstrap script applies stored light/dark only', () => {
+    const script = themeBootstrapScript()
+    expect(script).toContain(THEME_STORAGE_KEY)
+    localStorage.setItem(THEME_STORAGE_KEY, 'dark')
+    document.documentElement.removeAttribute('data-theme')
+    new Function(script)()
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+    localStorage.setItem(THEME_STORAGE_KEY, 'system')
+    document.documentElement.removeAttribute('data-theme')
+    new Function(script)()
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
+    localStorage.removeItem(THEME_STORAGE_KEY)
   })
 })

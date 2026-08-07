@@ -27,8 +27,9 @@ const CONCEPTS: readonly Concept[] = [
     href: '/state-management'
   },
   {
-    title: 'Design tokens',
-    description: 'A typed token system that stays the single origin for color, spacing, and type scale.',
+    title: 'Design tokens & theming',
+    description:
+      'Semantic color roles and shared scales as CSS variables, with light/dark themes and system preference.',
     status: 'done',
     href: '/tokens'
   },
