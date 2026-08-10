@@ -22,23 +22,22 @@ Front-end work has changed a lot since the SPA-everything era: rendering moved b
 - Re-render isolation: when context wins vs when a store wins
 - App Router file conventions (`layout`, `page`, `loading`, `error`)
 - Type-safe design tokens as a single origin for color, spacing, and type scale
-- Semantic color roles vs raw values: components bind to roles (`bg`, `text`), not hex
-- CSS custom properties as a runtime theme contract (`--color-*`, `--space-*`)
-- Light/dark theming via `[data-theme]` reassignment and `prefers-color-scheme`
-- FOUC-safe theme bootstrap (blocking head script + `localStorage`) and matching `color-scheme`
 - Core Web Vitals: LCP, CLS, and INP tracked against a budget
 - List virtualization (windowing): fixed-height range math, overscan, spacer-driven scroll
+- Progressive enhancement for forms: Server Actions as the form `action`, pure multi-field validation shared on every submit path, uncontrolled `defaultValue` rehydration
+- Field-level errors with `aria-invalid` / `aria-describedby`, form-level summaries, pending UI via `useFormStatus`
 - Accessibility: semantic roles, focus management, accessible names
 - Strict TypeScript with `noUncheckedIndexedAccess` and discriminated unions
 
 ## What's implemented
 
 - Scaffold: Next.js 15 App Router, React 19, strict TypeScript, Vitest + Testing Library, GitHub Actions CI, and a design-token stylesheet. The home route lists the planned concepts using an accessible `ConceptCard` component.
-- Design tokens & theming (light/dark) driven by CSS variables: typed shared scales plus semantic color roles per theme in `src/tokens`. `themesToStyleSheet` emits `:root`, `[data-theme="light|dark"]`, and a `prefers-color-scheme` rule when `data-theme` is unset. Layout injects the sheet and a FOUC-safe bootstrap script; `/tokens` demos both palettes and a light/dark/system toggle.
+- Design tokens: a typed token tree in `src/tokens` that generates the app's CSS custom properties. The root layout injects the generated `:root` rule at render time, so the token module is the runtime source and there is no second copy to drift. See the `/tokens` route.
 - Server Components + streaming: the `/streaming` route is a Server Component whose three cards are each their own async Server Component behind a Suspense boundary. The shell flushes first, then each card streams in as its own fetch settles, fastest first. Data comes from a small simulated layer built on a request-scoped memoizing loader (the `React.cache()` pattern), so components that read the same key during one render share a single fetch and a rejection is cached the same way. Tests cover the loader dedup, out-of-order settle order, and the async components rendered to static markup. See the `/streaming` route.
 - Server actions & optimistic UI: the `/data-patterns` route mutates a note list through a Server Action, so the browser never runs a fetch handler or a client API layer. `useActionState` holds the confirmed list plus the last error, `useOptimistic` overlays the in-flight note on top of it, and `useFormStatus` drives the pending button. The overlay is only a prediction, so React discards it when the action settles and a rejected write reverts on its own with no manual rollback. The mutation core (`applyAdd`) takes an injected store, which keeps validation, the fail path, and the store-throws path testable without the Next runtime. Tests cover trimming and length validation, the optimistic reducer folding pending dispatches newest-first, and confirmed state staying put on every failure mode. See the `/data-patterns` route.
 - Client state patterns: the `/state-management` route runs one pure cart reducer in two hosts. Context + `useReducer` (split state/dispatch) re-renders every state consumer on any field change. An external store on `useSyncExternalStore` lets each leaf select a slice and skip the render when that slice is unchanged. Typing the note field is the repro: context bumps badge and total counters; the store leaves them alone.
 - List virtualization for large datasets, with a perf before/after: the `/virtualization` route mounts the same 10,000 fixed-height rows two ways. The naive panel creates every DOM node. The virtual panel keeps a full-height spacer for the scrollbar and only mounts the viewport window plus overscan. Range calculation is O(1) arithmetic on `scrollTop`; tests cover empty input, overscan clamping, scroll edges, the hook, and the mounted-row before/after gap.
+- Robust forms: validation, pending state, progressive enhancement: the `/forms` route is a multi-field waitlist that posts to a Server Action. `parseWaitlistForm` + `validateWaitlist` are pure, so the same rules run on every submit (empty input, email shape, seat bounds, missing terms, multi-field errors). `applyWaitlistSubmit` returns field-keyed errors plus raw values so the form rehydrates with `defaultValue` after failure (uncontrolled PE). `useFormStatus` drives the pending button. HTML constraints document intent; `noValidate` keeps the shared schema as the single error source. See the `/forms` route.
 
 ## Stack
 
@@ -116,17 +115,22 @@ const range = getVisibleRange({
 // estimateMountCost(range.mountedCount) << estimateMountCost(itemCount)
 ```
 
-Styles use a typed helper; themes only rewrite color roles:
+The waitlist form shares one pure validator with the Server Action. Field errors rehydrate uncontrolled inputs:
 
 ```tsx
-import { token, themesToStyleSheet, resolveTheme, applyThemeAttribute } from '@/tokens'
+const [state, formAction] = useActionState(submitWaitlist, initialWaitlistState())
+// applyWaitlistSubmit: parse FormData -> validateWaitlist -> write
+// error: { fields, fieldErrors: { email: '…' }, formError }  success: cleared fields + submission id
+<input name="email" defaultValue={state.fields.email} aria-invalid={!!state.fieldErrors.email} />
+```
+
+Styles reference tokens through a typed helper, so a bad name fails to compile:
+
+```tsx
+import { token } from '@/tokens'
 
 <div style={{ color: token('color', 'accent'), padding: token('space', '4') }} />
 // token('color', 'nope') -> type error
-
-const css = themesToStyleSheet('dark') // :root + [data-theme] + prefers-color-scheme
-const resolved = resolveTheme('system', 'light') // 'light'
-applyThemeAttribute(document.documentElement, 'dark')
 ```
 
 ## Layout
@@ -134,8 +138,9 @@ applyThemeAttribute(document.documentElement, 'dark')
 ```
 app/                 App Router routes, layout, and global tokens
 src/components/      shared, tested UI primitives
+src/forms/           pure waitlist parse/validate/submit
 src/state/           pure cart reducer, context provider, external store
 src/virtualization/  fixed-height range math, item factory, virtual list hook
-src/tokens/          typed design tokens, theme CSS generation, theme toggle
+src/tokens/          typed design tokens and CSS variable generation
 test/                Vitest specs and setup
 ```

@@ -27,9 +27,8 @@ const CONCEPTS: readonly Concept[] = [
     href: '/state-management'
   },
   {
-    title: 'Design tokens & theming',
-    description:
-      'Semantic color roles and shared scales as CSS variables, with light/dark themes and system preference.',
+    title: 'Design tokens',
+    description: 'A typed token system that stays the single origin for color, spacing, and type scale.',
     status: 'done',
     href: '/tokens'
   },
@@ -40,10 +39,11 @@ const CONCEPTS: readonly Concept[] = [
     href: '/virtualization'
   },
   {
-    title: 'Performant animation',
-    description: 'FLIP reorders with transform, compositor-safe properties, and reduced-motion.',
+    title: 'Robust forms',
+    description:
+      'Shared pure validation, field-level errors, pending UI via useFormStatus, and progressive enhancement with Server Actions.',
     status: 'done',
-    href: '/animation'
+    href: '/forms'
   },
   {
     title: 'Core Web Vitals budget',
