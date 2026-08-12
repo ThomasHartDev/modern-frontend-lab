@@ -5,12 +5,8 @@ export interface Loader<K, V> {
   keys(): readonly K[]
 }
 
-// Request-scoped memoization, the same idea as React's `cache()`: several server
-// components that ask for the same key during one render share a single fetch.
-// The promise is stored, not the value, so concurrent reads dedupe before the
-// first one has even resolved. A rejected promise stays cached too, matching
-// `cache()` semantics, so a retry inside the same render fails the same way
-// instead of hammering a flaky source.
+// request-scoped memo like React cache(): concurrent reads share one promise
+
 export function createLoader<K, V>(fetcher: Fetcher<K, V>): Loader<K, V> {
   const inflight = new Map<K, Promise<V>>()
 

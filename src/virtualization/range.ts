@@ -14,7 +14,6 @@ export interface RangeParams {
   overscan?: number
 }
 
-// Fixed row height → O(1) index math. Variable height needs a size cache + search.
 export function getVisibleRange(params: RangeParams): VirtualRange {
   const itemCount = Math.max(0, Math.floor(params.itemCount))
   const itemHeight = params.itemHeight

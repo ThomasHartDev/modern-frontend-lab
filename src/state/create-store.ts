@@ -18,7 +18,7 @@ export function createReducerStore<T, A>(
     getState: () => state,
     dispatch(action) {
       const next = reducer(state, action)
-      // Bail when the reducer returns the same reference (no-op actions).
+
       if (Object.is(next, state)) return
       state = next
       for (const listener of listeners) listener()
@@ -31,7 +31,7 @@ export function createReducerStore<T, A>(
     }
   }
 }
-// Only re-render when the selected value fails isEqual. Context cannot do this.
+// re-render only when selected slice changes; context cannot skip that
 export function useStoreSelector<T, S>(
   store: Store<T>,
   selector: (state: T) => S,

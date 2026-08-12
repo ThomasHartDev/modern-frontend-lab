@@ -1,7 +1,5 @@
 import { token } from '@/tokens'
 
-// Shown while the route segment itself is still resolving on the server. The
-// per-card Suspense fallbacks in page.tsx take over once the shell streams in.
 export default function Loading() {
   return (
     <main

@@ -1,6 +1,3 @@
-// The single origin for design values. Every CSS custom property and every
-// token() reference is derived from this tree, so there is nowhere else to
-// drift out of sync.
 export const tokens = {
   color: {
     bg: '#0f1115',

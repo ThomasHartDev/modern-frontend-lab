@@ -102,7 +102,7 @@ function ContextPanel() {
     </Panel>
   )
 }
-// Store leaves each select one slice, so setNote leaves badge and total alone.
+
 type CartStore = ReducerStore<CartState, CartAction>
 function StoreBadge({ store }: { store: CartStore }) {
   const count = useStoreSelector(store, selectItemCount)

@@ -21,7 +21,7 @@ describe('createDataStore', () => {
     const store = createDataStore(counting)
 
     await Promise.all([store.profile('u1'), store.profile('u1'), store.recommendations()])
-    // Two distinct resources touched, so exactly two underlying reads.
+
     expect(waits).toBe(2)
   })
 

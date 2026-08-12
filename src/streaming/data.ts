@@ -25,8 +25,6 @@ export class NotFoundError extends Error {
   }
 }
 
-// Latencies are staggered so the route visibly streams out of order: the shell
-// paints, then each boundary flushes as its own fetch settles, fastest first.
 export const LATENCY = {
   profile: 120,
   activity: 640,
@@ -59,9 +57,8 @@ export interface DataStore {
   recommendations(): Promise<readonly Recommendation[]>
 }
 
-// One store per render pass keeps the memoization request-scoped: a module-level
-// cache would leak one request's data into the next. Tests pass a zero-latency
-// `wait` to stay fast and deterministic without fake timers.
+// one store per render so memoization stays request-scoped
+
 export function createDataStore(wait: Wait = realWait): DataStore {
   const profiles = createLoader<string, Profile>(async (id) => {
     await wait(LATENCY.profile)

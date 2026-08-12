@@ -38,7 +38,6 @@ export function ConceptCard({ title, description, status, href }: ConceptCardPro
     </>
   )
 
-  // A planned concept has no route yet, so it renders as static content, not a dead link.
   if (href === undefined) {
     return (
       <article style={cardStyle} aria-label={title}>

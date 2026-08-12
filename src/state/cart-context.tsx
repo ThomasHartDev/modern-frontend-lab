@@ -1,8 +1,8 @@
 'use client'
 import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react'
 import { cartReducer, EMPTY_CART, type CartAction, type CartState } from './cart'
-// Split state and dispatch so components that only dispatch do not re-render
-// when state changes. Dispatch identity is stable under useReducer.
+// split state/dispatch so dispatch-only consumers skip state re-renders
+
 const CartStateContext = createContext<CartState | null>(null)
 const CartDispatchContext = createContext<Dispatch<CartAction> | null>(null)
 export function CartProvider({

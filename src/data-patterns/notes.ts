@@ -37,9 +37,6 @@ export function toDisplayList(notes: readonly Note[]): DisplayNote[] {
   return notes.map(toDisplay)
 }
 
-// useOptimistic folds each pending dispatch over the confirmed base one at a
-// time, so this reducer only handles a single add. Newest sits on top, matching
-// how the confirmed list is stored (most recent first).
 export function reduceOptimistic(state: readonly DisplayNote[], pending: PendingNote): DisplayNote[] {
   return [{ pending: true, tempId: pending.tempId, text: pending.text }, ...state]
 }
@@ -74,10 +71,6 @@ export interface AddInput {
   fail: boolean
 }
 
-// The authoritative mutation. On failure the previous list is returned untouched
-// so the client can revert its optimistic guess and re-show the typed value. A
-// thrown store error is treated the same as an explicit `fail`: the write did
-// not land, so confirmed state must not move.
 export async function applyAdd(prev: FormState, input: AddInput, store: NotesStore): Promise<FormState> {
   const validation = validateNoteText(input.text)
   if (!validation.ok) return { notes: prev.notes, error: validation.error }

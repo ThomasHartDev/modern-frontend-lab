@@ -17,8 +17,6 @@ export function cssVarName<G extends TokenGroup>(group: G, key: TokenKey<G>): st
   return varName(group, key)
 }
 
-// Returns a `var(--group-key)` reference for use in styles. The generic keeps
-// callers honest: token('color', 'nope') is a compile error, not a silent typo.
 export function token<G extends TokenGroup>(group: G, key: TokenKey<G>): string {
   return `var(${cssVarName(group, key)})`
 }

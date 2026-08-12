@@ -5,9 +5,6 @@ import { createDataStore, type Wait } from '@/streaming/data'
 
 const instant: Wait = () => Promise.resolve()
 
-// An async Server Component is just `async () => ReactElement`. Awaiting it and
-// rendering the resolved element proves the component fetched and mapped real
-// data, without needing a running Next server.
 async function renderServer(node: Promise<ReactElement>): Promise<string> {
   return renderToStaticMarkup(await node)
 }
