@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from 'next'
 import type { ReactNode } from 'react'
-import { cssVariablesToRootRule, tokensToCssVariables } from '@/tokens'
+import { themeBootstrapScript, themesToStyleSheet } from '@/tokens'
 import './globals.css'
 
-const tokenRootRule = cssVariablesToRootRule(tokensToCssVariables())
+const tokenStyleSheet = themesToStyleSheet()
+const bootstrapScript = themeBootstrapScript()
 
 export const metadata: Metadata = {
   title: 'Modern Frontend Lab',
@@ -12,14 +13,18 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#0f1115'
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f4f5f7' },
+    { media: '(prefers-color-scheme: dark)', color: '#0f1115' }
+  ]
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <style dangerouslySetInnerHTML={{ __html: tokenRootRule }} />
+        <style dangerouslySetInnerHTML={{ __html: tokenStyleSheet }} />
+        <script dangerouslySetInnerHTML={{ __html: bootstrapScript }} />
       </head>
       <body>{children}</body>
     </html>

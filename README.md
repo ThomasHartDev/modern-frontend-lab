@@ -22,21 +22,23 @@ Front-end work has changed a lot since the SPA-everything era: rendering moved b
 - Re-render isolation: when context wins vs when a store wins
 - App Router file conventions (`layout`, `page`, `loading`, `error`)
 - Type-safe design tokens as a single origin for color, spacing, and type scale
+- Semantic color roles vs raw values: components bind to roles (`bg`, `text`), not hex
+- CSS custom properties as a runtime theme contract (`--color-*`, `--space-*`)
+- Light/dark theming via `[data-theme]` reassignment and `prefers-color-scheme`
+- FOUC-safe theme bootstrap (blocking head script + `localStorage`) and matching `color-scheme`
 - Core Web Vitals: LCP, CLS, and INP tracked against a budget
 - List virtualization (windowing): fixed-height range math, overscan, spacer-driven scroll
-- Performant animation: compositor properties (`transform`, `opacity`), FLIP (First/Last/Invert/Play), `prefers-reduced-motion`
 - Accessibility: semantic roles, focus management, accessible names
 - Strict TypeScript with `noUncheckedIndexedAccess` and discriminated unions
 
 ## What's implemented
 
 - Scaffold: Next.js 15 App Router, React 19, strict TypeScript, Vitest + Testing Library, GitHub Actions CI, and a design-token stylesheet. The home route lists the planned concepts using an accessible `ConceptCard` component.
-- Design tokens: a typed token tree in `src/tokens` that generates the app's CSS custom properties. The root layout injects the generated `:root` rule at render time, so the token module is the runtime source and there is no second copy to drift. See the `/tokens` route.
+- Design tokens & theming (light/dark) driven by CSS variables: typed shared scales plus semantic color roles per theme in `src/tokens`. `themesToStyleSheet` emits `:root`, `[data-theme="light|dark"]`, and a `prefers-color-scheme` rule when `data-theme` is unset. Layout injects the sheet and a FOUC-safe bootstrap script; `/tokens` demos both palettes and a light/dark/system toggle.
 - Server Components + streaming: the `/streaming` route is a Server Component whose three cards are each their own async Server Component behind a Suspense boundary. The shell flushes first, then each card streams in as its own fetch settles, fastest first. Data comes from a small simulated layer built on a request-scoped memoizing loader (the `React.cache()` pattern), so components that read the same key during one render share a single fetch and a rejection is cached the same way. Tests cover the loader dedup, out-of-order settle order, and the async components rendered to static markup. See the `/streaming` route.
 - Server actions & optimistic UI: the `/data-patterns` route mutates a note list through a Server Action, so the browser never runs a fetch handler or a client API layer. `useActionState` holds the confirmed list plus the last error, `useOptimistic` overlays the in-flight note on top of it, and `useFormStatus` drives the pending button. The overlay is only a prediction, so React discards it when the action settles and a rejected write reverts on its own with no manual rollback. The mutation core (`applyAdd`) takes an injected store, which keeps validation, the fail path, and the store-throws path testable without the Next runtime. Tests cover trimming and length validation, the optimistic reducer folding pending dispatches newest-first, and confirmed state staying put on every failure mode. See the `/data-patterns` route.
 - Client state patterns: the `/state-management` route runs one pure cart reducer in two hosts. Context + `useReducer` (split state/dispatch) re-renders every state consumer on any field change. An external store on `useSyncExternalStore` lets each leaf select a slice and skip the render when that slice is unchanged. Typing the note field is the repro: context bumps badge and total counters; the store leaves them alone.
 - List virtualization for large datasets, with a perf before/after: the `/virtualization` route mounts the same 10,000 fixed-height rows two ways. The naive panel creates every DOM node. The virtual panel keeps a full-height spacer for the scrollbar and only mounts the viewport window plus overscan. Range calculation is O(1) arithmetic on `scrollTop`; tests cover empty input, overscan clamping, scroll edges, the hook, and the mounted-row before/after gap.
-- Performant animation (transforms, FLIP, reduced-motion) without jank: the `/animation` route shuffles a tile grid with FLIP. Pure helpers compute invert deltas from First/Last rects, classify CSS properties as compositor vs layout, and resolve a motion policy that drops duration to zero under `prefers-reduced-motion`. `useFlip` snapshots rects in `useLayoutEffect`, applies a compensating `transform`, then transitions to identity. Cost labels contrast `transform`/`opacity` with `top`/`left`/`width`. Tests cover empty maps, zero-size rects, noop thresholds, reduced-motion, shuffle, the hook, and demo controls.
 
 ## Stack
 
@@ -114,24 +116,17 @@ const range = getVisibleRange({
 // estimateMountCost(range.mountedCount) << estimateMountCost(itemCount)
 ```
 
-FLIP turns a layout reorder into a short compositor animation. Reduced motion skips the invert and lands on the final rect:
+Styles use a typed helper; themes only rewrite color roles:
 
 ```tsx
-const first = captureRects(elementsBefore)
-// …React commits the new order…
-const plan = planFlip(first, captureRects(elementsAfter))
-const policy = resolveMotionPolicy({ prefersReducedMotion })
-// each entry: transform = invertTransform(delta) → transition transform → ''
-// isCompositorSafe(['transform']) === true; isCompositorSafe(['top', 'left']) === false
-```
-
-Styles reference tokens through a typed helper, so a bad name fails to compile:
-
-```tsx
-import { token } from '@/tokens'
+import { token, themesToStyleSheet, resolveTheme, applyThemeAttribute } from '@/tokens'
 
 <div style={{ color: token('color', 'accent'), padding: token('space', '4') }} />
 // token('color', 'nope') -> type error
+
+const css = themesToStyleSheet('dark') // :root + [data-theme] + prefers-color-scheme
+const resolved = resolveTheme('system', 'light') // 'light'
+applyThemeAttribute(document.documentElement, 'dark')
 ```
 
 ## Layout
@@ -139,9 +134,8 @@ import { token } from '@/tokens'
 ```
 app/                 App Router routes, layout, and global tokens
 src/components/      shared, tested UI primitives
-src/animation/       FLIP math, motion policy, compositor costs, useFlip
 src/state/           pure cart reducer, context provider, external store
 src/virtualization/  fixed-height range math, item factory, virtual list hook
-src/tokens/          typed design tokens and CSS variable generation
+src/tokens/          typed design tokens, theme CSS generation, theme toggle
 test/                Vitest specs and setup
 ```
