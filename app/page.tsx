@@ -39,6 +39,12 @@ const CONCEPTS: readonly Concept[] = [
     href: '/virtualization'
   },
   {
+    title: 'Accessible components',
+    description: 'Focus traps, ARIA dialogs, roving tabindex, and axe-core checks.',
+    status: 'done',
+    href: '/accessibility'
+  },
+  {
     title: 'Core Web Vitals budget',
     description: 'Project LCP, CLS, and INP lab samples against a hard budget so missing or over-budget metrics fail the report.',
     status: 'done',
