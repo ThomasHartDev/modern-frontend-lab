@@ -39,16 +39,15 @@ const CONCEPTS: readonly Concept[] = [
     href: '/virtualization'
   },
   {
-    title: 'Accessible components',
-    description: 'Focus traps, ARIA dialogs, roving tabindex, and axe-core checks.',
+    title: 'Performant animation',
+    description: 'FLIP reorders with transform, compositor-safe properties, and reduced-motion.',
     status: 'done',
-    href: '/accessibility'
+    href: '/animation'
   },
   {
     title: 'Core Web Vitals budget',
-    description: 'Project LCP, CLS, and INP lab samples against a hard budget so missing or over-budget metrics fail the report.',
-    status: 'done',
-    href: '/cwv'
+    description: 'Track LCP, CLS, and INP against a budget so regressions fail loudly.',
+    status: 'planned'
   }
 ]
 
