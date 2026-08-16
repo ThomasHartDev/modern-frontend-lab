@@ -22,7 +22,7 @@ Front-end work has changed a lot since the SPA-everything era: rendering moved b
 - Re-render isolation: when context wins vs when a store wins
 - App Router file conventions (`layout`, `page`, `loading`, `error`)
 - Type-safe design tokens as a single origin for color, spacing, and type scale
-- Core Web Vitals: LCP, CLS, and INP tracked against a budget
+- Core Web Vitals budgets: LCP/INP/CLS thresholds, CLS session windows, INP percentiles
 - List virtualization (windowing): fixed-height range math, overscan, spacer-driven scroll
 - Accessibility: semantic roles, focus management, accessible names
 - Strict TypeScript with `noUncheckedIndexedAccess` and discriminated unions
@@ -35,6 +35,7 @@ Front-end work has changed a lot since the SPA-everything era: rendering moved b
 - Server actions & optimistic UI: the `/data-patterns` route mutates a note list through a Server Action, so the browser never runs a fetch handler or a client API layer. `useActionState` holds the confirmed list plus the last error, `useOptimistic` overlays the in-flight note on top of it, and `useFormStatus` drives the pending button. The overlay is only a prediction, so React discards it when the action settles and a rejected write reverts on its own with no manual rollback. The mutation core (`applyAdd`) takes an injected store, which keeps validation, the fail path, and the store-throws path testable without the Next runtime. Tests cover trimming and length validation, the optimistic reducer folding pending dispatches newest-first, and confirmed state staying put on every failure mode. See the `/data-patterns` route.
 - Client state patterns: the `/state-management` route runs one pure cart reducer in two hosts. Context + `useReducer` (split state/dispatch) re-renders every state consumer on any field change. An external store on `useSyncExternalStore` lets each leaf select a slice and skip the render when that slice is unchanged. Typing the note field is the repro: context bumps badge and total counters; the store leaves them alone.
 - List virtualization for large datasets, with a perf before/after: the `/virtualization` route mounts the same 10,000 fixed-height rows two ways. The naive panel creates every DOM node. The virtual panel keeps a full-height spacer for the scrollbar and only mounts the viewport window plus overscan. Range calculation is O(1) arithmetic on `scrollTop`; tests cover empty input, overscan clamping, scroll edges, the hook, and the mounted-row before/after gap.
+- Core Web Vitals budget: `/cwv` evaluates projected lab samples for LCP, INP, and CLS against the Chrome "good" cuts (2.5s / 200ms / 0.1). Pure metric math covers final LCP, CLS session windows (1s gap, 5s cap; sorted by startTime), and INP (max under 50 samples, ~98th percentile at scale). `projectRoute('slow'|'fixed')` builds the sample sets; the budget gate fails when any budgeted metric is missing, null, or over ceiling. The demo shows an unreserved late-injected hero vs an aspect-ratio reserved one, plus an INP probe that reports click→first-frame separately from work duration.
 
 ## Stack
 
@@ -112,6 +113,16 @@ const range = getVisibleRange({
 // estimateMountCost(range.mountedCount) << estimateMountCost(itemCount)
 ```
 
+CWV budgets share one threshold table with the evaluator:
+
+```tsx
+import { computeCls, evaluateBudget, projectRoute } from '@/cwv'
+
+evaluateBudget(projectRoute('slow').samples).pass  // false
+evaluateBudget(projectRoute('fixed').samples).pass // true
+computeCls([{ value: 0.08, startTime: 0 }, { value: 0.2, startTime: 2000 }]) // 0.2
+```
+
 Styles reference tokens through a typed helper, so a bad name fails to compile:
 
 ```tsx
@@ -126,6 +137,7 @@ import { token } from '@/tokens'
 ```
 app/                 App Router routes, layout, and global tokens
 src/components/      shared, tested UI primitives
+src/cwv/             LCP/INP/CLS calculators, budget evaluator, route projections
 src/state/           pure cart reducer, context provider, external store
 src/virtualization/  fixed-height range math, item factory, virtual list hook
 src/tokens/          typed design tokens and CSS variable generation
